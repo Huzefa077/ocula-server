@@ -1,6 +1,6 @@
 # Ocula Server
 
-Ocula Server is the backend application for the Ocula full-stack project. It is built with Node.js and Express, connects to a PostgreSQL database on Neon, and provides the API used by the frontend.
+It is the backend application for the Ocula full-stack project which is built with Node.js and Express, connects to a PostgreSQL database on Neon, and provides the API used by the frontend.
 
 ## Overview
 

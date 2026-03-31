@@ -1,3 +1,4 @@
+// Checks login details and returns the matching user profile.
 const handleSignin = (db, bcrypt) => async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -7,9 +8,8 @@ const handleSignin = (db, bcrypt) => async (req, res) => {
       return res.status(400).json('incorrect form submission');
     }
 
-    // 2. Get user auth data
-    const data = await db
-      .select('email', 'hash')
+    // Auth data is kept separate from the public profile data.
+    const data = await db.select('email', 'hash')
       .from('user_auth')
       .where('email', '=', email);
 
@@ -25,9 +25,8 @@ const handleSignin = (db, bcrypt) => async (req, res) => {
       return res.status(400).json('wrong credentials');
     }
 
-    // 5. Get user profile
-    const user = await db
-      .select('*')
+    // After password check, return the user profile used by the UI.
+    const user = await db.select('*')
       .from('user_profiles') 
       .where('email', '=', email);
 

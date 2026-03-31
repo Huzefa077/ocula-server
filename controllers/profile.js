@@ -1,3 +1,4 @@
+// Returns one user profile by id.
 const handleProfileGet = (req, res, db) => {
   const { id } = req.params; 
   db.select('*').from('user_profiles').where({id})

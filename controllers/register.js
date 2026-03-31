@@ -1,6 +1,5 @@
-const bcrypt = require('bcryptjs');
-
-const handleRegister = (req, res, db) => {
+// Creates a new user in both auth and profile tables.
+const handleRegister = (req, res, db, bcrypt) => {
   console.log('REGISTER ENDPOINT CALLED');
   console.log('Received body:', req.body);
 
@@ -12,10 +11,11 @@ const handleRegister = (req, res, db) => {
     return res.status(400).json('incorrect form submission');
   }
 
-  // Hashing
+  // Store the password as a hash, not plain text.
   const hash = bcrypt.hashSync(password, 10);
   console.log('Hash created successfully');
 
+  // Use one transaction so both inserts succeed or fail together.
   db.transaction(trx => {
     trx
       .insert({

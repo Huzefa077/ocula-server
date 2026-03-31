@@ -42,7 +42,7 @@ ocula-server/
 
 ## Environment Variables
 
-Create a `.env` file in the project root.
+Create a `.env` file in the project root for local development.
 
 ```env
 DATABASE_URL=your_neon_database_connection_string
@@ -59,10 +59,16 @@ npm install
 
 ## Running the Project
 
-Start the backend server:
+Start the backend server in production mode:
 
 ```bash
 npm start
+```
+
+Start the backend server in local development with `.env` loading and auto-restart:
+
+```bash
+npm run dev
 ```
 
 By default, the local server runs on:
@@ -119,7 +125,7 @@ Required environment variable:
 DATABASE_URL=your_neon_database_connection_string
 ```
 
-Render typically provides `PORT` automatically in production.
+Render typically provides `PORT` automatically in production and injects environment variables from the dashboard, so `npm start` does not rely on a local `.env` file.
 
 ## Notes
 

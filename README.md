@@ -1,55 +1,82 @@
 # Ocula Server
 
-It is the backend application for the Ocula full-stack project which is built with Node.js and Express, connects to a PostgreSQL database on Neon, and provides the API used by the frontend.
+Ocula Server is the backend API for the Ocula full-stack project. It is built with Node.js and Express, uses PostgreSQL on Neon, and handles authentication, profile access, image entry updates, and image proxy requests for the frontend application.
+
+## Live API
+
+- Production API: [https://ocula-server.onrender.com](https://ocula-server.onrender.com)
+- Health Check: [https://ocula-server.onrender.com/](https://ocula-server.onrender.com/)
 
 ## Overview
 
-The backend handles:
+This service is responsible for:
 
 - user registration
 - user sign in
-- profile lookup
-- image entry count updates
-- image proxy support
-- backend health checking
-
-It serves as the main API layer between the frontend application and the database.
+- profile retrieval by user ID
+- updating image entry counts
+- proxying image requests when needed
+- exposing a health-check endpoint for frontend availability checks
 
 ## Tech Stack
 
+- JavaScript (ES6+)
 - Node.js
 - Express
 - PostgreSQL
 - Knex
 - bcryptjs
+- CORS
 - Neon
+
+## Runtime Versions
+
+- Node.js: 20.x
+- npm: 10.x
 
 ## Project Structure
 
 ```text
 ocula-server/
-├── controllers/
-│   ├── image.js
-│   ├── imageProxy.js
-│   ├── profile.js
-│   ├── register.js
-│   └── signin.js
-├── .env.example
-├── package.json
-├── server.js
-└── README.md
+|-- controllers/
+|   |-- image.js
+|   |-- imageProxy.js
+|   |-- profile.js
+|   |-- register.js
+|   `-- signin.js
+|-- .env.example
+|-- package.json
+|-- server.js
+`-- README.md
 ```
 
 ## Environment Variables
 
-Create a `.env` file in the project root for local development.
+Create a `.env` file in the project root for local development:
 
 ```env
 DATABASE_URL=your_neon_database_connection_string
 PORT=3001
 ```
 
-The server checks for `DATABASE_URL` on startup and stops early if it is missing.
+Example:
+
+```env
+DATABASE_URL=postgresql://username:password@your-neon-host/database_name?sslmode=require
+PORT=3001
+```
+
+`DATABASE_URL` is required. The server checks for it on startup and stops early if it is missing.
+
+## Database
+
+The backend uses PostgreSQL hosted on Neon.
+
+- Provider: [Neon](https://neon.com/)
+- Connection variable: `DATABASE_URL`
+- Query builder: `Knex`
+
+The real database connection string should remain in local `.env` files and deployment environment settings, not in the repository.
 
 ## Installation
 
@@ -57,21 +84,21 @@ The server checks for `DATABASE_URL` on startup and stops early if it is missing
 npm install
 ```
 
-## Running the Project
+## Running Locally
 
-Start the backend server in production mode:
+Start the server:
 
 ```bash
 npm start
 ```
 
-Start the backend server in local development with `.env` loading and auto-restart:
+Start the server in local development with automatic restart and `.env` loading:
 
 ```bash
 npm run dev
 ```
 
-By default, the local server runs on:
+Default local address:
 
 ```text
 http://localhost:3001
@@ -85,16 +112,37 @@ http://localhost:3001
 GET /
 ```
 
+Returns a simple response to confirm that the backend is running.
+
 ### Sign In
 
 ```http
 POST /signin
 ```
 
+Expected body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "yourpassword"
+}
+```
+
 ### Register
 
 ```http
 POST /register
+```
+
+Expected body:
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "yourpassword"
+}
 ```
 
 ### Profile
@@ -109,6 +157,14 @@ GET /profile/:id
 PUT /image
 ```
 
+Expected body:
+
+```json
+{
+  "id": "123"
+}
+```
+
 ### Image Proxy
 
 ```http
@@ -117,22 +173,22 @@ GET /image-proxy
 
 ## Deployment
 
-The backend is intended to be deployed on Render.
+The backend is deployed on Render.
 
-Required environment variable:
+Deployment notes:
 
-```env
-DATABASE_URL=your_neon_database_connection_string
-```
-
-Render typically provides `PORT` automatically in production and injects environment variables from the dashboard, so `npm start` does not rely on a local `.env` file.
+- set the root directory to `ocula-server` if deploying from a monorepo
+- use `npm start` as the start command
+- add the environment variables from the `Environment Variables` section
+- Render usually provides `PORT` automatically in production
 
 ## Notes
 
-- The backend uses PostgreSQL through Knex.
-- The local `.env` file should not be committed.
-- `.env.example` should be committed to document the required configuration.
+- The backend uses a simple health route at `/` for uptime checks.
+- Database access is configured centrally in `server.js`.
+- Local `.env` files should not be committed.
+- `.env.example` should be committed to document the required setup.
 
 ## Related Project
 
-The frontend for this application is available in the `ocula-frontend` folder.
+The frontend application for this project is available in the `ocula-frontend` project.

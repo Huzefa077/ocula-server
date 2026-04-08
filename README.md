@@ -1,3 +1,4 @@
+<!-- This file explains what the backend project does and how to run and deploy it. -->
 # Ocula Server
 
 Ocula Server is the backend API for the Ocula full-stack project. It is built with Node.js and Express, uses PostgreSQL on Neon, and handles authentication, profile access, image entry updates, and image proxy requests for the frontend application.

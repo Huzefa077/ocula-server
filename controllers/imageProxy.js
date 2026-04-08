@@ -1,3 +1,4 @@
+// This file safely fetches external images through the backend when the frontend cannot load them directly.
 const DISALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
 
 function isPrivateIpv4(hostname) {
@@ -46,12 +47,13 @@ const handleImageProxy = async (req, res) => {
   }
 
   // Timeout keeps one slow image request from hanging the server too long.
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  // AbortController is the cancel handle. Calling .abort() stops the in-flight fetch if it takes too long.
+  const imageRequestController = new AbortController();
+  const imageRequestTimeoutId = setTimeout(() => imageRequestController.abort(), 10000);
 
   try {
     const upstreamResponse = await fetch(parsedUrl.toString(), {
-      signal: controller.signal,
+      signal: imageRequestController.signal,
       headers: {
         Accept: 'image/*,*/*;q=0.8',
         'User-Agent': 'Ocula Image Proxy'
@@ -82,7 +84,7 @@ const handleImageProxy = async (req, res) => {
 
     return res.status(502).json(message);
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(imageRequestTimeoutId);
   }
 };
 

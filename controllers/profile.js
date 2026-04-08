@@ -1,3 +1,4 @@
+// This file returns one user's profile data when the frontend asks for it by id.
 // Returns one user profile by id.
 const handleProfileGet = (req, res, db) => {
   const { id } = req.params; 

@@ -1,3 +1,4 @@
+// This file updates how many images a signed-in user has submitted for detection.
 // Increases the user's image entry count after a successful detect.
 const handleImage = (req, res, db) => {
   const { id } = req.body;

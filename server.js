@@ -1,3 +1,4 @@
+// This file starts the backend server, connects to the database, and wires all API routes together.
 console.log("SERVER.JS LOADED - UPDATED FOR RENDER");
 
 const express = require('express');

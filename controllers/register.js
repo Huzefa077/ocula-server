@@ -1,3 +1,4 @@
+// This file creates a new user account and saves it in both the auth and profile tables.
 // Creates a new user in both auth and profile tables.
 const handleRegister = (req, res, db, bcrypt) => {
   console.log('REGISTER ENDPOINT CALLED');
@@ -12,31 +13,31 @@ const handleRegister = (req, res, db, bcrypt) => {
   }
 
   // Store the password as a hash, not plain text.
-  const hash = bcrypt.hashSync(password, 10);
+  const passwordHash = bcrypt.hashSync(password, 10);
   console.log('Hash created successfully');
 
   // Use one transaction so both inserts succeed or fail together.
   db.transaction(trx => {
     trx
       .insert({
-        hash: hash,
+        hash: passwordHash,
         email: email
       })
       .into('user_auth')
       .returning('email')
-      .then(loginEmail => {
-        console.log('Login entry inserted:', loginEmail);
+      .then(authRows => {
+        console.log('Login entry inserted:', authRows);
 
         return trx('user_profiles')
           .returning('*')
           .insert({
-            email: loginEmail[0].email,
+            email: authRows[0].email,
             name: name,
             joined: new Date()
           })
-          .then(user => {
-            console.log('User registered:', user[0]);
-            res.json(user[0]);
+          .then(userRows => {
+            console.log('User registered:', userRows[0]);
+            res.json(userRows[0]);
           });
       })
       .then(trx.commit)

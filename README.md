@@ -34,6 +34,7 @@ This service is responsible for:
 
 - Node.js: 20.x
 - npm: 10.x
+- Package Manager: npm
 
 ## Project Structure
 

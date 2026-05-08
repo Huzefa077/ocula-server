@@ -1,4 +1,5 @@
 const handleListUsers = (req, res, db) => {
+  // Only public profile fields are returned. Password hashes stay in user_auth.
   db('user_profiles')
     .select('id', 'name', 'email', 'entries', 'joined')
     .orderBy('id', 'asc')
@@ -18,6 +19,7 @@ const handleDeleteUser = async (req, res, db) => {
   }
 
   try {
+    // The transaction keeps auth/profile deletion together as one database operation.
     const deletedUser = await db.transaction(async (trx) => {
       const userRows = await trx('user_profiles')
         .select('id', 'email', 'name')

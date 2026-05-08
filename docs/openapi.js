@@ -1,3 +1,5 @@
+// This object describes the backend API using the OpenAPI standard.
+// Swagger UI reads it and creates the interactive documentation at /docs.
 const openApiDocument = {
   openapi: '3.0.3',
   info: {
@@ -13,6 +15,8 @@ const openApiDocument = {
   ],
   components: {
     securitySchemes: {
+      // bearerAuth means protected requests must send:
+      // Authorization: Bearer <jwt-token>
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
@@ -21,6 +25,8 @@ const openApiDocument = {
     }
   },
   paths: {
+    // Each key below is one backend URL. The nested get/post/put/delete object
+    // explains what HTTP method that URL supports.
     '/': {
       get: {
         summary: 'Health check',
@@ -85,6 +91,7 @@ const openApiDocument = {
     '/profile/{id}': {
       get: {
         summary: 'Get a user profile',
+        // security tells Swagger this route needs a JWT token.
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -110,6 +117,7 @@ const openApiDocument = {
     '/image': {
       put: {
         summary: 'Increment the signed-in user entry count',
+        // The backend uses the token to make sure users can only update allowed accounts.
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -135,6 +143,7 @@ const openApiDocument = {
     '/admin/users': {
       get: {
         summary: 'Admin-only example route to list users',
+        // This route also has requireRole('admin') in app.js.
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
@@ -149,6 +158,7 @@ const openApiDocument = {
     '/admin/users/{id}': {
       delete: {
         summary: 'Admin-only route to completely delete a user',
+        // The {id} part in the path becomes req.params.id in Express.
         security: [{ bearerAuth: [] }],
         parameters: [
           {

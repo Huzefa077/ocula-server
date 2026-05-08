@@ -1,6 +1,8 @@
 // This file checks a user's login details and returns the matching profile when the credentials are correct.
 // Checks login details and returns the matching user profile.
-const handleSignin = (db, bcrypt) => async (req, res) => {
+const { createAuthToken, getUserRole } = require('../utils/auth');
+
+const handleSignin = (db, bcrypt, jwtSecret) => async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -31,8 +33,21 @@ const handleSignin = (db, bcrypt) => async (req, res) => {
       .from('user_profiles') 
       .where('email', '=', email);
 
-    // 6. Return user
-    return res.json(userRows[0]);
+    if (userRows.length === 0) {
+      return res.status(400).json('wrong credentials');
+    }
+
+    const userProfile = userRows[0];
+    const token = createAuthToken(userProfile, jwtSecret);
+
+    // Return both the user profile and the token so the frontend can call protected routes.
+    return res.json({
+      token,
+      user: {
+        ...userProfile,
+        role: getUserRole(userProfile)
+      }
+    });
 
   } catch (err) {
     console.error('Signin error:', err);

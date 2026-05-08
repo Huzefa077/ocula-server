@@ -1,65 +1,61 @@
-<!-- This file explains what the backend project does and how to run and deploy it. -->
 # Ocula Server
 
-Ocula Server is the backend API for the Ocula full-stack project. It is built with Node.js and Express, uses PostgreSQL on Neon, and handles authentication, profile access, image entry updates, and image proxy requests for the frontend application.
+Backend API for **Ocula**, a full-stack face analysis app where users can register, sign in, submit image URLs, detect faces, and track their scan count.
 
-## Live API
+This backend was built as a learning-focused Node.js project with practical production pieces: authentication, protected routes, PostgreSQL storage, API documentation, rate limiting, and deployment on Render.
 
-- Production API: [https://ocula-server.onrender.com](https://ocula-server.onrender.com)
+## Live Links
+
+- Frontend Demo: [https://ocula-frontend.vercel.app/](https://ocula-frontend.vercel.app/)
+- Backend API: [https://ocula-server.onrender.com](https://ocula-server.onrender.com)
+- API Docs: [https://ocula-server.onrender.com/docs](https://ocula-server.onrender.com/docs)
 - Health Check: [https://ocula-server.onrender.com/](https://ocula-server.onrender.com/)
 
-## Overview
+## What This Backend Handles
 
-This service is responsible for:
-
-- user registration
-- user sign in with JWT token generation
-- protected profile retrieval by user ID
-- protected image entry updates
-- proxying image requests when needed
-- exposing a health-check endpoint for frontend availability checks
-- limiting repeated sign-in and registration attempts
-- exposing Swagger API documentation
+- User registration and sign in
+- Password hashing with `bcryptjs`
+- JWT token creation and verification
+- Protected profile and image-count routes
+- Basic role-based access control for admin routes
+- Admin user listing and deletion
+- PostgreSQL database access through Knex
+- Image proxy support for frontend image loading
+- Rate limiting for auth routes
+- Swagger API documentation
 
 ## Tech Stack
 
-- JavaScript (ES6+)
 - Node.js
 - Express
 - PostgreSQL
 - Knex
+- JSON Web Tokens
 - bcryptjs
-- CORS
-- JSON Web Tokens (JWT)
 - express-rate-limit
 - Swagger UI
-- Neon
-
-## Runtime Versions
-
-- Node.js: 20.x
-- npm: 10.x
-- Package Manager: npm
+- Render
+- Neon Database
 
 ## Project Structure
 
 ```text
 ocula-server/
-|-- controllers/
-|   |-- image.js
-|   |-- imageProxy.js
-|   |-- profile.js
-|   |-- register.js
-|   `-- signin.js
-|-- .env.example
-|-- package.json
-|-- server.js
+|-- controllers/          # Route handlers for auth, profile, image, and admin logic
+|-- docs/                 # Swagger/OpenAPI API documentation
+|-- middleware/           # JWT auth and role-check middleware
+|-- tests/                # Backend API tests
+|-- utils/                # Shared auth helpers
+|-- app.js                # Express app setup and route wiring
+|-- db.js                 # Database connection setup
+|-- server.js             # Production/local server entry point
+|-- .env.example          # Example environment variables
 `-- README.md
 ```
 
 ## Environment Variables
 
-Create a `.env` file in the project root for local development:
+Create a `.env` file locally using this shape:
 
 ```env
 DATABASE_URL=your_neon_database_connection_string
@@ -69,204 +65,109 @@ FRONTEND_URL=http://localhost:3000
 PORT=3001
 ```
 
-Example:
+Required:
 
-```env
-DATABASE_URL=postgresql://username:password@your-neon-host/database_name?sslmode=require
-JWT_SECRET=replace_with_a_long_random_secret
-ADMIN_EMAIL=admin@example.com
-FRONTEND_URL=http://localhost:3000
-PORT=3001
-```
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: secret key used to sign and verify JWT tokens
 
-Required variables:
+Recommended:
 
-- `DATABASE_URL` for PostgreSQL access
-- `JWT_SECRET` for signing and verifying login tokens
+- `ADMIN_EMAIL`: email that receives admin access
+- `FRONTEND_URL`: frontend origin allowed by CORS
+- `PORT`: local server port, usually `3001`
 
-Helpful optional variables:
+Real `.env` values should stay local or inside Render/Vercel environment settings. They should not be committed to GitHub.
 
-- `ADMIN_EMAIL` gives one email admin access for the RBAC example route
-- `FRONTEND_URL` locks CORS to your frontend origin in production
+## Running Locally
 
-## Database
-
-The backend uses PostgreSQL hosted on Neon.
-
-- Provider: [Neon](https://neon.com/)
-- Connection variable: `DATABASE_URL`
-- Query builder: `Knex`
-
-The real database connection string should remain in local `.env` files and deployment environment settings, not in the repository.
-
-## Installation
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-## Running Locally
-
-Start the server:
+Start the backend:
 
 ```bash
 npm start
 ```
 
-Start the server in local development with automatic restart and `.env` loading:
+Start in development mode with `.env` loading and auto-restart:
 
 ```bash
 npm run dev
 ```
 
-Run backend tests:
+Run tests:
 
 ```bash
 npm test
 ```
 
-Default local address:
+Default local API:
 
 ```text
 http://localhost:3001
 ```
 
-## API Routes
+## Main API Routes
 
-### Health Check
+| Method | Route | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/` | Health check | No |
+| `POST` | `/signin` | Sign in and receive JWT token | No |
+| `POST` | `/register` | Create a new account | No |
+| `GET` | `/profile/:id` | Get a user profile | Yes |
+| `PUT` | `/image` | Increment image scan count | Yes |
+| `GET` | `/admin/users` | List users for admin | Admin |
+| `DELETE` | `/admin/users/:id` | Delete a user for admin | Admin |
+| `GET` | `/image-proxy` | Proxy image requests | No |
+| `GET` | `/docs` | Swagger API docs | No |
 
-```http
-GET /
-```
-
-Returns a simple response to confirm that the backend is running.
-
-### Sign In
-
-```http
-POST /signin
-```
-
-Expected body:
-
-```json
-{
-  "email": "user@example.com",
-  "password": "yourpassword"
-}
-```
-
-Returns:
-
-- signed-in user profile
-- JWT token for protected routes
-
-### Register
+Protected routes expect:
 
 ```http
-POST /register
+Authorization: Bearer <token>
 ```
 
-Expected body:
+## Deployment Notes
 
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "yourpassword"
-}
+This backend is deployed on Render.
+
+Render setup:
+
+- Root Directory: `ocula-server`
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Environment Variables: add the values from the environment section
+
+The React frontend is deployed separately on Vercel and calls this backend through `REACT_APP_API_URL`.
+
+Vercel frontend variable:
+
+```env
+REACT_APP_API_URL=https://ocula-server.onrender.com
 ```
 
-### Profile
+Render backend variable for CORS:
 
-```http
-GET /profile/:id
+```env
+FRONTEND_URL=https://ocula-frontend.vercel.app
 ```
 
-Requires:
+## What I Learned
 
-- `Authorization: Bearer <token>`
+This project helped me practice:
 
-### Image Entry Update
-
-```http
-PUT /image
-```
-
-Expected body:
-
-```json
-{
-  "id": "123"
-}
-```
-
-Requires:
-
-- `Authorization: Bearer <token>`
-
-### Admin Users
-
-```http
-GET /admin/users
-```
-
-Requires:
-
-- `Authorization: Bearer <token>`
-- token role must be `admin`
-
-### Delete User
-
-```http
-DELETE /admin/users/:id
-```
-
-Requires:
-
-- `Authorization: Bearer <token>`
-- token role must be `admin`
-
-Behavior:
-
-- deletes the user's profile row
-- deletes the user's auth row
-- blocks the admin from deleting the currently signed-in account
-
-### Image Proxy
-
-```http
-GET /image-proxy
-```
-
-### Swagger Docs
-
-```http
-GET /docs
-GET /docs.json
-```
-
-## Deployment
-
-The backend is deployed on Render.
-
-Deployment notes:
-
-- set the root directory to `ocula-server` if deploying from a monorepo
-- use `npm start` as the start command
-- add the environment variables from the `Environment Variables` section
-- Render usually provides `PORT` automatically in production
-
-## Notes
-
-- The backend uses a simple health route at `/` for uptime checks.
-- Database access is configured centrally in `server.js`.
-- JWT protects the profile and image routes.
-- Registration already uses a transaction so auth and profile rows succeed or fail together.
-- The admin route is intentionally small and is only there to demonstrate beginner-friendly RBAC.
-- Local `.env` files should not be committed.
-- `.env.example` should be committed to document the required setup.
+- Separating frontend and backend responsibilities
+- Using JWT without exposing the server secret to the frontend
+- Protecting routes with middleware
+- Keeping password hashes separate from public user profile data
+- Writing beginner-friendly API tests
+- Deploying a full-stack app with separate frontend and backend services
 
 ## Related Project
 
-The frontend application for this project is available in the `ocula-frontend` project.
+Frontend repository/folder: `ocula-frontend`
+
+Live frontend: [https://ocula-frontend.vercel.app/](https://ocula-frontend.vercel.app/)

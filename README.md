@@ -1,6 +1,6 @@
 # Ocula Server
 
-Backend API for **Ocula**, a full-stack face analysis app where users can register, sign in, submit image URLs, detect faces, and track their scan count.
+Backend API for **Ocula**, a full-stack face analysis app. Face detection itself runs client-side in the browser using face-api.js — this service handles user accounts, authentication, email verification, password reset, Google sign-in, scan-count tracking, and image-proxy support for image URLs blocked by browser CORS.
 
 This backend was built as a learning-focused Node.js project with practical production pieces: authentication, protected routes, PostgreSQL storage, API documentation, rate limiting, and deployment on Render.
 
@@ -14,6 +14,9 @@ This backend was built as a learning-focused Node.js project with practical prod
 ## What This Backend Handles
 
 - User registration and sign in
+- Email verification for password accounts
+- Password reset links
+- Google sign-in with backend token verification
 - Password hashing with `bcryptjs`
 - JWT token creation and verification
 - Protected profile and image-count routes
@@ -43,7 +46,10 @@ This backend was built as a learning-focused Node.js project with practical prod
 ocula-server/
 |-- controllers/          # Route handlers for auth, profile, image, and admin logic
 |-- docs/                 # Swagger/OpenAPI API documentation
+|-- migrations/           # SQL changes needed by newer auth features
 |-- middleware/           # JWT auth and role-check middleware
+|-- services/             # Email and token helper services
+|-- scripts/              # Utility scripts for migrations and measurements
 |-- tests/                # Backend API tests
 |-- utils/                # Shared auth helpers
 |-- app.js                # Express app setup and route wiring
@@ -61,8 +67,15 @@ Create a `.env` file locally using this shape:
 DATABASE_URL=your_neon_database_connection_string
 JWT_SECRET=replace_with_a_long_random_secret
 ADMIN_EMAIL=admin@example.com
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3000,http://localhost:3002
 PORT=3001
+GOOGLE_CLIENT_ID=your_google_web_client_id.apps.googleusercontent.com
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+EMAIL_FROM="Ocula <no-reply@example.com>"
 ```
 
 Required:
@@ -73,10 +86,14 @@ Required:
 Recommended:
 
 - `ADMIN_EMAIL`: email that receives admin access
-- `FRONTEND_URL`: frontend origin allowed by CORS
+- `FRONTEND_URL`: frontend origins allowed by CORS, separated by commas
 - `PORT`: local server port, usually `3001`
+- `GOOGLE_CLIENT_ID`: required for Google sign-in
+- `SMTP_*` and `EMAIL_FROM`: required to send real verification/reset emails
 
 Real `.env` values should stay local or inside Render/Vercel environment settings. They should not be committed to GitHub.
+
+If SMTP values are missing, the backend logs verification/reset links in the terminal. That is useful for local testing, but not enough for a public deployed app.
 
 ## Running Locally
 
@@ -104,6 +121,12 @@ Run tests:
 npm test
 ```
 
+Run database migrations after adding the auth environment variables:
+
+```bash
+npm run migrate
+```
+
 Default local API:
 
 ```text
@@ -116,7 +139,12 @@ http://localhost:3001
 | --- | --- | --- | --- |
 | `GET` | `/` | Health check | No |
 | `POST` | `/signin` | Sign in and receive JWT token | No |
-| `POST` | `/register` | Create a new account | No |
+| `POST` | `/register` | Create a new account and send verification email | No |
+| `POST` | `/verify-email` | Verify email and receive JWT token | No |
+| `POST` | `/resend-verification` | Send a new verification link | No |
+| `POST` | `/forgot-password` | Request password reset link | No |
+| `POST` | `/reset-password` | Set a new password with token | No |
+| `POST` | `/auth/google` | Sign in/register with Google ID token | No |
 | `GET` | `/profile/:id` | Get a user profile | Yes |
 | `PUT` | `/image` | Increment image scan count | Yes |
 | `GET` | `/admin/users` | List users for admin | Admin |
@@ -140,6 +168,7 @@ Render setup:
 - Build Command: `npm install`
 - Start Command: `npm start`
 - Environment Variables: add the values from the environment section
+- After deploy: run `npm run migrate` once from a trusted local terminal or Render shell
 
 The React frontend is deployed separately on Vercel and calls this backend through `REACT_APP_API_URL`.
 
@@ -153,6 +182,12 @@ Render backend variable for CORS:
 
 ```env
 FRONTEND_URL=https://ocula-frontend.vercel.app
+```
+
+Google sign-in requires the same Google Web Client ID in both places:
+
+```env
+GOOGLE_CLIENT_ID=your_google_web_client_id.apps.googleusercontent.com
 ```
 
 ## What I Learned

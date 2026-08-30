@@ -10,8 +10,9 @@ const profile = require('./controllers/profile');
 const image = require('./controllers/image');
 const imageProxy = require('./controllers/imageProxy');
 const admin = require('./controllers/admin');
+const authFlows = require('./controllers/authFlows');
 const { createRequireAuth } = require('./middleware/requireAuth');
-const { requireRole } = require('./middleware/requireRole');
+const { requirePermission } = require('./middleware/requirePermission');
 const { openApiDocument } = require('./docs/openapi');
 
 // Small helper around express-rate-limit so each route can choose its own limits.
@@ -23,6 +24,36 @@ function createRateLimiter(windowMs, max, message) {
     legacyHeaders: false,
     message
   });
+}
+
+function createCorsOptions(corsOrigin) {
+  if (corsOrigin === true) {
+    return { origin: true, credentials: true };
+  }
+
+  const allowedOrigins = String(corsOrigin || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return {
+    origin(origin, callback) {
+      // Requests from tools like curl/Postman do not send an Origin header.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const isAllowedProductionOrigin = allowedOrigins.includes(origin);
+      const isAllowedLocalReactOrigin = /^http:\/\/localhost:300[0-9]$/.test(origin);
+
+      if (isAllowedProductionOrigin || isAllowedLocalReactOrigin) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true
+  };
 }
 
 // createApp builds the Express application without starting the network server.
@@ -41,6 +72,11 @@ function createApp({
     windowMs: 10 * 60 * 1000,
     max: 5,
     message: 'Too many registration attempts. Please try again later.'
+  },
+  passwordResetLimiterConfig = {
+    windowMs: 10 * 60 * 1000,
+    max: 3,
+    message: 'Too many password reset attempts. Please try again later.'
   }
 }) {
   const app = express();
@@ -59,12 +95,14 @@ function createApp({
     registerLimiterConfig.max,
     registerLimiterConfig.message
   );
+  const passwordResetLimiter = createRateLimiter(
+    passwordResetLimiterConfig.windowMs,
+    passwordResetLimiterConfig.max,
+    passwordResetLimiterConfig.message
+  );
 
-  // CORS controls which frontend website is allowed to call this backend in a browser.
-  app.use(cors({
-    origin: corsOrigin,
-    credentials: true
-  }));
+  // CORS controls which frontend websites are allowed to call this backend in a browser.
+  app.use(cors(createCorsOptions(corsOrigin)));
 
   // express.json() lets Express read JSON request bodies as req.body.
   app.use(express.json());
@@ -84,8 +122,14 @@ function createApp({
   app.post('/signin', signinLimiter, signin.handleSignin(db, bcryptLib, jwtSecret));
   
   app.post('/register', registerLimiter, (req, res) => {
-    register.handleRegister(req, res, db, bcryptLib, jwtSecret);
+    register.handleRegister(req, res, db, bcryptLib);
   });
+
+  app.post('/verify-email', authFlows.handleVerifyEmail(db, jwtSecret));
+  app.post('/resend-verification', registerLimiter, authFlows.handleResendVerification(db));
+  app.post('/forgot-password', passwordResetLimiter, authFlows.handleForgotPassword(db));
+  app.post('/reset-password', passwordResetLimiter, authFlows.handleResetPassword(db, bcryptLib));
+  app.post('/auth/google', signinLimiter, authFlows.handleGoogleAuth(db, jwtSecret));
 
   // Protected user routes: requireAuth verifies the Bearer token before controller code runs.
   app.get('/profile/:id', requireAuth, (req, res) => {
@@ -96,11 +140,11 @@ function createApp({
     image.handleImage(req, res, db);
   });
 
-  // Admin routes use two checks: first verify the token, then verify the user's role.
-  app.get('/admin/users', requireAuth, requireRole('admin'), (req, res) => {
+  // Admin routes use two checks: first verify the token, then verify permissions.
+  app.get('/admin/users', requireAuth, requirePermission('view_users'), (req, res) => {
     admin.handleListUsers(req, res, db);
   });
-  app.delete('/admin/users/:id', requireAuth, requireRole('admin'), (req, res) => {
+  app.delete('/admin/users/:id', requireAuth, requirePermission('delete_users'), (req, res) => {
     admin.handleDeleteUser(req, res, db);
   });
 

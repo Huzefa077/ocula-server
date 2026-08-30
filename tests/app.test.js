@@ -7,7 +7,8 @@ const { createApp } = require('../app');
 function createFakeDb() {
   const fakeProfiles = [
     { id: 1, name: 'Admin', email: 'admin@example.com', role: 'admin', entries: 5, joined: '2025-01-01' },
-    { id: 2, name: 'Huzefa', email: 'user@example.com', entries: 3, joined: '2025-01-02' }
+    { id: 2, name: 'Huzefa', email: 'user@example.com', entries: 3, joined: '2025-01-02' },
+    { id: 3, name: 'New User', email: 'unverified@example.com', entries: 0, joined: '2025-01-03', is_email_verified: false }
   ];
 
   return {
@@ -25,6 +26,9 @@ function createFakeDb() {
                 }
                 if (matchValue === 'admin@example.com') {
                   return Promise.resolve([{ email: 'admin@example.com', hash: 'stored-hash' }]);
+                }
+                if (matchValue === 'unverified@example.com') {
+                  return Promise.resolve([{ email: 'unverified@example.com', hash: 'stored-hash' }]);
                 }
                 return Promise.resolve([]);
               }
@@ -133,6 +137,7 @@ test('POST /signin returns a token and user profile for valid credentials', asyn
 
   assert.equal(response.status, 200);
   assert.equal(response.body.user.email, 'user@example.com');
+  assert.deepEqual(response.body.user.permissions, []);
   assert.ok(response.body.token);
 });
 
@@ -146,6 +151,21 @@ test('GET /profile/:id blocks requests without a JWT token', async () => {
   const response = await request(app).get('/profile/2');
 
   assert.equal(response.status, 401);
+});
+
+test('POST /signin blocks password login until email is verified', async () => {
+  const app = createApp({
+    db: createFakeDb(),
+    bcryptLib: fakeBcrypt,
+    jwtSecret: 'test-secret'
+  });
+
+  const response = await request(app)
+    .post('/signin')
+    .send({ email: 'unverified@example.com', password: 'secret123' });
+
+  assert.equal(response.status, 403);
+  assert.equal(response.body, 'Please verify your email before signing in');
 });
 
 test('GET /profile/:id allows the signed-in user to read their own profile', async () => {
@@ -233,12 +253,32 @@ test('DELETE /admin/users/:id allows admin to remove another user', async () => 
     .post('/signin')
     .send({ email: 'admin@example.com', password: 'secret123' });
 
+  assert.deepEqual(signinResponse.body.user.permissions, ['view_users', 'delete_users']);
+
   const response = await request(app)
     .delete('/admin/users/2')
     .set('Authorization', `Bearer ${signinResponse.body.token}`);
 
   assert.equal(response.status, 200);
   assert.equal(response.body.deletedUser.email, 'user@example.com');
+});
+
+test('GET /admin/users blocks regular users without the view_users permission', async () => {
+  const app = createApp({
+    db: createFakeDb(),
+    bcryptLib: fakeBcrypt,
+    jwtSecret: 'test-secret'
+  });
+
+  const signinResponse = await request(app)
+    .post('/signin')
+    .send({ email: 'user@example.com', password: 'secret123' });
+
+  const response = await request(app)
+    .get('/admin/users')
+    .set('Authorization', `Bearer ${signinResponse.body.token}`);
+
+  assert.equal(response.status, 403);
 });
 
 test('DELETE /admin/users/:id blocks admin from deleting the signed-in admin account', async () => {

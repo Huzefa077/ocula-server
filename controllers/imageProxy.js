@@ -1,5 +1,14 @@
 // This file safely fetches external images through the backend when the frontend cannot load them directly.
-const DISALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+const DISALLOWED_HOSTS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+  'metadata.google.internal'
+]);
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_REDIRECTS = 3;
 
 function isPrivateIpv4(hostname) {
   return (
@@ -22,6 +31,74 @@ function isBlockedHostname(hostname) {
   );
 }
 
+function validateImageUrl(rawUrl) {
+  const parsedUrl = new URL(rawUrl);
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('Only HTTP and HTTPS image URLs are allowed');
+  }
+
+  if (isBlockedHostname(parsedUrl.hostname)) {
+    throw new Error('That image host is not allowed');
+  }
+
+  return parsedUrl;
+}
+
+async function fetchWithSafeRedirects(startUrl, requestOptions, redirectsLeft = MAX_REDIRECTS) {
+  const response = await fetch(startUrl.toString(), {
+    ...requestOptions,
+    redirect: 'manual'
+  });
+
+  if (![301, 302, 303, 307, 308].includes(response.status)) {
+    return response;
+  }
+
+  if (redirectsLeft <= 0) {
+    throw new Error('Too many image redirects');
+  }
+
+  const location = response.headers.get('location');
+
+  if (!location) {
+    throw new Error('Image redirect is missing a location');
+  }
+
+  // Every redirect target is validated again so an allowed URL cannot bounce
+  // the backend into a private/internal network address.
+  const nextUrl = validateImageUrl(new URL(location, startUrl).toString());
+  return fetchWithSafeRedirects(nextUrl, requestOptions, redirectsLeft - 1);
+}
+
+async function readImageBodyWithLimit(response) {
+  const contentLength = Number(response.headers.get('content-length') || 0);
+
+  if (contentLength > MAX_IMAGE_BYTES) {
+    throw new Error('Image is larger than 5MB');
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) break;
+
+    totalBytes += value.length;
+
+    if (totalBytes > MAX_IMAGE_BYTES) {
+      throw new Error('Image is larger than 5MB');
+    }
+
+    chunks.push(Buffer.from(value));
+  }
+
+  return Buffer.concat(chunks);
+}
+
 // Fetches a remote image through the backend when direct loading is not possible.
 const handleImageProxy = async (req, res) => {
   const { url } = req.query;
@@ -33,17 +110,9 @@ const handleImageProxy = async (req, res) => {
   let parsedUrl;
 
   try {
-    parsedUrl = new URL(url);
+    parsedUrl = validateImageUrl(url);
   } catch (error) {
-    return res.status(400).json('Invalid image URL');
-  }
-
-  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    return res.status(400).json('Only HTTP and HTTPS image URLs are allowed');
-  }
-
-  if (isBlockedHostname(parsedUrl.hostname)) {
-    return res.status(400).json('That image host is not allowed');
+    return res.status(400).json(error.message || 'Invalid image URL');
   }
 
   // Timeout keeps one slow image request from hanging the server too long.
@@ -52,7 +121,7 @@ const handleImageProxy = async (req, res) => {
   const imageRequestTimeoutId = setTimeout(() => imageRequestController.abort(), 10000);
 
   try {
-    const upstreamResponse = await fetch(parsedUrl.toString(), {
+    const upstreamResponse = await fetchWithSafeRedirects(parsedUrl, {
       signal: imageRequestController.signal,
       headers: {
         Accept: 'image/*,*/*;q=0.8',
@@ -65,14 +134,15 @@ const handleImageProxy = async (req, res) => {
     }
 
     const contentType = upstreamResponse.headers.get('content-type') || '';
+    const mimeType = contentType.split(';')[0].trim().toLowerCase();
 
-    if (!contentType.startsWith('image/')) {
-      return res.status(415).json('URL did not return an image');
+    if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+      return res.status(415).json('Only JPEG, PNG, and WebP images are supported');
     }
 
-    const imageBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
+    const imageBuffer = await readImageBodyWithLimit(upstreamResponse);
 
-    res.set('Content-Type', contentType);
+    res.set('Content-Type', mimeType);
     res.set('Cache-Control', 'public, max-age=600');
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
@@ -80,7 +150,7 @@ const handleImageProxy = async (req, res) => {
   } catch (error) {
     const message = error.name === 'AbortError'
       ? 'Image request timed out'
-      : 'Unable to fetch image';
+      : error.message || 'Unable to fetch image';
 
     return res.status(502).json(message);
   } finally {

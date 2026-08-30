@@ -64,7 +64,7 @@ const openApiDocument = {
     },
     '/register': {
       post: {
-        summary: 'Create a new user account',
+        summary: 'Create a new user account and send verification email',
         requestBody: {
           required: true,
           content: {
@@ -83,8 +83,66 @@ const openApiDocument = {
         },
         responses: {
           200: {
-            description: 'User created successfully'
+            description: 'User created; verification email sent or logged in development'
           }
+        }
+      }
+    },
+    '/verify-email': {
+      post: {
+        summary: 'Verify an email address using the emailed token',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'token'],
+                properties: {
+                  email: { type: 'string', format: 'email' },
+                  token: { type: 'string' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Email verified; JWT token returned' },
+          400: { description: 'Invalid or expired verification link' }
+        }
+      }
+    },
+    '/resend-verification': {
+      post: {
+        summary: 'Send a new verification email',
+        responses: {
+          200: { description: 'Verification email sent when needed' }
+        }
+      }
+    },
+    '/forgot-password': {
+      post: {
+        summary: 'Start password reset flow',
+        responses: {
+          200: { description: 'Generic reset response returned' }
+        }
+      }
+    },
+    '/reset-password': {
+      post: {
+        summary: 'Reset password using emailed token',
+        responses: {
+          200: { description: 'Password reset successfully' },
+          400: { description: 'Invalid or expired reset link' }
+        }
+      }
+    },
+    '/auth/google': {
+      post: {
+        summary: 'Sign in or register with a verified Google ID token',
+        responses: {
+          200: { description: 'JWT token and user returned' },
+          400: { description: 'Google token could not be verified' }
         }
       }
     },
@@ -142,8 +200,8 @@ const openApiDocument = {
     },
     '/admin/users': {
       get: {
-        summary: 'Admin-only example route to list users',
-        // This route also has requireRole('admin') in app.js.
+        summary: 'Permission-protected route to list users',
+        // This route requires the view_users permission in app.js.
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
@@ -157,7 +215,7 @@ const openApiDocument = {
     },
     '/admin/users/{id}': {
       delete: {
-        summary: 'Admin-only route to completely delete a user',
+        summary: 'Permission-protected route to completely delete a user',
         // The {id} part in the path becomes req.params.id in Express.
         security: [{ bearerAuth: [] }],
         parameters: [

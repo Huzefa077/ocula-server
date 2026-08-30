@@ -15,4 +15,10 @@ const app = createApp({ db });
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Knex opens the database connection lazily. Warming it here moves the first
+  // Neon connection cost away from the user's first sign-in/register request.
+  db.raw('select 1')
+    .then(() => console.log('Database connection warmed'))
+    .catch((error) => console.error('Database warm-up failed:', error.message));
 });

@@ -52,7 +52,7 @@ function createAuthToken(userProfile, jwtSecret = process.env.JWT_SECRET) {
       permissions: getRolePermissions(role)
     },
     jwtSecret,
-    { expiresIn: '2h' }
+    { expiresIn: '7d' }
   );
 }
 

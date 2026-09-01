@@ -9,6 +9,7 @@ const signin = require('./controllers/signin');
 const profile = require('./controllers/profile');
 const image = require('./controllers/image');
 const imageProxy = require('./controllers/imageProxy');
+const scanHistory = require('./controllers/scanHistory');
 const admin = require('./controllers/admin');
 const authFlows = require('./controllers/authFlows');
 const { createRequireAuth } = require('./middleware/requireAuth');
@@ -139,6 +140,11 @@ function createApp({
   app.put('/image', requireAuth, (req, res) => {
     image.handleImage(req, res, db);
   });
+
+  app.get('/scan-history', requireAuth, scanHistory.handleListScanHistory(db));
+  app.post('/scan-history', requireAuth, scanHistory.handleCreateScanHistory(db));
+  app.delete('/scan-history/:id', requireAuth, scanHistory.handleDeleteScanHistoryItem(db));
+  app.delete('/scan-history', requireAuth, scanHistory.handleClearScanHistory(db));
 
   // Admin routes use two checks: first verify the token, then verify permissions.
   app.get('/admin/users', requireAuth, requirePermission('view_users'), (req, res) => {
